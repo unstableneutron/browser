@@ -27,6 +27,7 @@ const dump = @import("browser/dump.zig");
 const mcp = @import("mcp.zig");
 const Storage = @import("storage/Storage.zig");
 const WebBotAuthConfig = @import("network/WebBotAuth.zig").Config;
+const BrowserProfile = @import("browser_profile.zig").Profile;
 
 const Allocator = std.mem.Allocator;
 
@@ -92,6 +93,7 @@ const CommonOptions = .{
     .{ .name = "web_bot_auth_keyid", .type = ?[]const u8 },
     .{ .name = "web_bot_auth_domain", .type = ?[]const u8 },
     .{ .name = "user_agent", .type = ?[]const u8 },
+    .{ .name = "impersonate", .type = ?BrowserProfile },
     .{ .name = "block_private_networks", .type = bool },
     .{ .name = "block_cidrs", .type = ?[]const u8 },
     .{ .name = "cookie", .type = ?[]const u8 },
@@ -350,6 +352,13 @@ pub fn userAgent(self: *const Config) ?[]const u8 {
     };
 }
 
+pub fn impersonate(self: *const Config) BrowserProfile {
+    return switch (self.mode) {
+        inline .serve, .fetch, .mcp => |opts| opts.impersonate orelse .lightpanda,
+        .help, .version => .lightpanda,
+    };
+}
+
 pub fn httpCacheDir(self: *const Config) ?[]const u8 {
     return switch (self.mode) {
         inline .serve, .fetch, .mcp => |opts| opts.http_cache_dir,
@@ -490,17 +499,18 @@ pub const HttpHeaders = struct {
 
     user_agent: [:0]const u8, // User agent value (e.g. "Lightpanda/1.0")
     user_agent_header: [:0]const u8,
+    owns_user_agent: bool,
 
     proxy_bearer_header: ?[:0]const u8,
 
     pub fn init(allocator: Allocator, config: *const Config) !HttpHeaders {
-        const user_agent: [:0]const u8 = if (config.userAgent()) |ua|
-            try allocator.dupeZ(u8, ua)
+        const user_agent, const owns_user_agent = if (config.userAgent()) |ua|
+            .{ try allocator.dupeZ(u8, ua), true }
         else if (config.userAgentSuffix()) |suffix|
-            try std.fmt.allocPrintSentinel(allocator, "{s} {s}", .{ user_agent_base, suffix }, 0)
+            .{ try std.fmt.allocPrintSentinel(allocator, "{s} {s}", .{ config.impersonate().navigatorUserAgent(), suffix }, 0), true }
         else
-            user_agent_base;
-        errdefer if (config.userAgent() != null or config.userAgentSuffix() != null) allocator.free(user_agent);
+            .{ try allocator.dupeZ(u8, config.impersonate().navigatorUserAgent()), true };
+        errdefer if (owns_user_agent) allocator.free(user_agent);
 
         const user_agent_header = try std.fmt.allocPrintSentinel(allocator, "User-Agent: {s}", .{user_agent}, 0);
         errdefer allocator.free(user_agent_header);
@@ -513,6 +523,7 @@ pub const HttpHeaders = struct {
         return .{
             .user_agent = user_agent,
             .user_agent_header = user_agent_header,
+            .owns_user_agent = owns_user_agent,
             .proxy_bearer_header = proxy_bearer_header,
         };
     }
@@ -522,7 +533,7 @@ pub const HttpHeaders = struct {
             allocator.free(hdr);
         }
         allocator.free(self.user_agent_header);
-        if (self.user_agent.ptr != user_agent_base.ptr) {
+        if (self.owns_user_agent) {
             allocator.free(self.user_agent);
         }
     }
@@ -636,7 +647,13 @@ pub fn printUsageAndExit(self: *const Config, success: bool) void {
         \\                Incompatible with --user-agent-suffix
         \\
         \\--user-agent-suffix
-        \\                Suffix to append to the Lightpanda/X.Y User-Agent
+        \\                Suffix to append to the selected User-Agent
+        \\
+        \\--impersonate   Browser fingerprint profile to use for TLS/HTTP2 and
+        \\                JavaScript-visible navigator values.
+        \\                Defaults to lightpanda.
+        \\                Choices:
+    ++ BrowserProfile.supported_profiles ++
         \\
         \\--web-bot-auth-key-file
         \\                Path to the Ed25519 private key PEM file.

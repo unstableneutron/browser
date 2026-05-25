@@ -421,6 +421,12 @@ pub const Connection = struct {
         libcurl.curl_easy_reset(self._easy);
         self.transport = .none;
 
+        if (comptime libcurl.HAS_IMPERSONATE) {
+            if (config.impersonate().curlTarget()) |target| {
+                try libcurl.curl_easy_impersonate(self._easy, target);
+            }
+        }
+
         // timeouts
         try libcurl.curl_easy_setopt(self._easy, .timeout_ms, config.httpTimeout());
         try libcurl.curl_easy_setopt(self._easy, .connect_timeout_ms, config.httpConnectTimeout());

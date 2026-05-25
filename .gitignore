@@ -5,3 +5,6 @@ zig-out
 lightpanda.id
 /src/html5ever/target/
 src/snapshot.bin
+/v8/
+.worktrees/
+node_modules/

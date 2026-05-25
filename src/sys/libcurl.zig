@@ -25,6 +25,8 @@ const c = @cImport({
 
 const IS_DEBUG = builtin.mode == .Debug;
 
+pub const HAS_IMPERSONATE = @hasDecl(c, "CURLOPT_IMPERSONATE");
+
 pub const Curl = c.CURL;
 pub const CurlM = c.CURLM;
 pub const CurlCode = c.CURLcode;
@@ -585,6 +587,11 @@ pub fn curl_easy_reset(easy: *Curl) void {
 
 pub fn curl_easy_perform(easy: *Curl) Error!void {
     try errorCheck(c.curl_easy_perform(easy));
+}
+
+pub fn curl_easy_impersonate(easy: *Curl, target: [:0]const u8) Error!void {
+    if (comptime !HAS_IMPERSONATE) return;
+    try errorCheck(c.curl_easy_setopt(easy, c.CURLOPT_IMPERSONATE, target.ptr));
 }
 
 pub fn curl_easy_setopt(easy: *Curl, comptime option: CurlOption, value: anytype) Error!void {

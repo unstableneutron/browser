@@ -42,6 +42,7 @@ pub fn build(b: *Build) !void {
     const prebuilt_v8_path = b.option([]const u8, "prebuilt_v8_path", "Path to prebuilt libc_v8.a");
     const snapshot_path = b.option([]const u8, "snapshot_path", "Path to v8 snapshot");
     const wpt_extensions = b.option(bool, "wpt_extensions", "Extend WebAPI with WPT driver behavior") orelse false;
+    const use_curl_impersonate = b.option(bool, "use_curl_impersonate", "Use prebuilt curl-impersonate for TLS fingerprinting") orelse false;
 
     const version = resolveVersion(b);
     var stderr = std.fs.File.stderr().writer(&.{});
@@ -85,7 +86,7 @@ pub fn build(b: *Build) !void {
         b.default_step.dependOn(fmt_step);
 
         try linkV8(b, mod, enable_asan, enable_tsan, prebuilt_v8_path);
-        try linkCurl(b, mod, enable_tsan);
+        try linkCurl(b, mod, enable_tsan, use_curl_impersonate);
         try linkHtml5Ever(b, mod);
 
         break :blk mod;
@@ -324,8 +325,13 @@ fn linkSqlite(b: *Build, mod: *Build.Module, enable_csan: ?std.zig.SanitizeC, is
     mod.linkLibrary(lib);
 }
 
-fn linkCurl(b: *Build, mod: *Build.Module, is_tsan: bool) !void {
+fn linkCurl(b: *Build, mod: *Build.Module, is_tsan: bool, use_curl_impersonate: bool) !void {
     const target = mod.resolved_target.?;
+
+    if (use_curl_impersonate) {
+        linkCurlImpersonate(b, mod, target, is_tsan);
+        return;
+    }
 
     const curl = buildCurl(b, target, mod.optimize.?, is_tsan);
     mod.linkLibrary(curl);
@@ -349,12 +355,64 @@ fn linkCurl(b: *Build, mod: *Build.Module, is_tsan: bool) !void {
     // sees idn2.h transitively if a system libidn2 happens to be installed.
     mod.linkLibrary(libidn2);
 
+    linkCurlSystemDeps(mod, target);
+}
+
+fn linkCurlImpersonate(b: *Build, mod: *Build.Module, target: Build.ResolvedTarget, is_tsan: bool) void {
+    const out_path = b.fmt("vendor/curl-impersonate/out/{s}-{s}", .{
+        @tagName(target.result.os.tag),
+        @tagName(target.result.cpu.arch),
+    });
+    const lib_path = b.fmt("{s}/lib", .{out_path});
+
+    mod.addIncludePath(b.path(b.fmt("{s}/include", .{out_path})));
+    mod.addObjectFile(b.path(b.fmt("{s}/libcurl-impersonate.a", .{lib_path})));
+
+    // Source-built installs keep dependency archives separate. Release assets
+    // bundle them into libcurl-impersonate.a, so link the separate set only
+    // when it is actually present.
+    if (fileExists(b, b.fmt("{s}/libssl.a", .{lib_path}))) {
+        inline for (.{
+            "libssl.a",
+            "libcrypto.a",
+            "libnghttp2.a",
+            "libngtcp2.a",
+            "libngtcp2_crypto_boringssl.a",
+            "libnghttp3.a",
+            "libbrotlidec.a",
+            "libbrotlicommon.a",
+            "libbrotlienc.a",
+            "libz.a",
+            "libzstd.a",
+        }) |name| {
+            mod.addObjectFile(b.path(b.fmt("{s}/{s}", .{ lib_path, name })));
+        }
+    }
+    const libidn2 = buildLibidn2(b, target, mod.optimize.?, is_tsan);
+    mod.linkLibrary(libidn2);
+
+    mod.addCMacro("USE_CURL_IMPERSONATE", "1");
+    linkCurlSystemDeps(mod, target);
+}
+
+fn fileExists(b: *Build, rel_path: []const u8) bool {
+    std.fs.cwd().access(b.pathFromRoot(rel_path), .{}) catch return false;
+    return true;
+}
+
+fn linkCurlSystemDeps(mod: *Build.Module, target: Build.ResolvedTarget) void {
     switch (target.result.os.tag) {
         .macos => {
-            // needed for proxying on mac
+            // needed for proxying on mac, and by curl-impersonate release archives
             mod.addSystemFrameworkPath(.{ .cwd_relative = "/System/Library/Frameworks" });
             mod.linkFramework("CoreFoundation", .{});
+            mod.linkFramework("CoreServices", .{});
             mod.linkFramework("SystemConfiguration", .{});
+            mod.linkSystemLibrary("iconv", .{});
+            mod.linkSystemLibrary("icucore", .{});
+        },
+        .linux => {
+            mod.linkSystemLibrary("stdc++", .{});
         },
         else => {},
     }

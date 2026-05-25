@@ -1,0 +1,4 @@
+[submodule "vendor/curl-impersonate"]
+	path = vendor/curl-impersonate
+	url = https://github.com/unstableneutron/curl-impersonate.git
+	ignore = untracked
