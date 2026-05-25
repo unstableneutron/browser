@@ -8,6 +8,7 @@ const uuidv4 = @import("../id.zig").uuidv4;
 
 const log = lp.log;
 const IID_FILE = "iid";
+const DISABLE_ENV = "LIGHTPANDA_DISABLE_TELEMETRY";
 const Allocator = std.mem.Allocator;
 
 pub fn isDisabled() bool {
@@ -15,7 +16,21 @@ pub fn isDisabled() bool {
         return true;
     }
 
-    return std.process.hasEnvVarConstant("LIGHTPANDA_DISABLE_TELEMETRY");
+    const value = std.process.getEnvVarOwned(std.heap.page_allocator, DISABLE_ENV) catch |err| switch (err) {
+        error.EnvironmentVariableNotFound => return isDisabledFromEnvValue(null),
+        else => return true,
+    };
+    defer std.heap.page_allocator.free(value);
+
+    return isDisabledFromEnvValue(value);
+}
+
+fn isDisabledFromEnvValue(value: ?[]const u8) bool {
+    const raw = value orelse return true;
+    if (std.ascii.eqlIgnoreCase(raw, "false") or std.mem.eql(u8, raw, "0")) {
+        return false;
+    }
+    return true;
 }
 
 pub const Telemetry = TelemetryT(@import("lightpanda.zig"));
@@ -119,13 +134,22 @@ extern fn setenv(name: [*:0]u8, value: [*:0]u8, override: c_int) c_int;
 extern fn unsetenv(name: [*:0]u8) c_int;
 
 const testing = @import("../testing.zig");
+test "telemetry: disabled by default unless explicitly enabled" {
+    try testing.expectEqual(true, isDisabledFromEnvValue(null));
+    try testing.expectEqual(true, isDisabledFromEnvValue(""));
+    try testing.expectEqual(true, isDisabledFromEnvValue("true"));
+    try testing.expectEqual(true, isDisabledFromEnvValue("1"));
+    try testing.expectEqual(false, isDisabledFromEnvValue("false"));
+    try testing.expectEqual(false, isDisabledFromEnvValue("0"));
+}
+
 test "telemetry: always disabled in debug builds" {
     // Must be disabled regardless of environment variable.
-    _ = unsetenv(@constCast("LIGHTPANDA_DISABLE_TELEMETRY"));
+    _ = unsetenv(@constCast(DISABLE_ENV));
     try testing.expectEqual(true, isDisabled());
 
-    _ = setenv(@constCast("LIGHTPANDA_DISABLE_TELEMETRY"), @constCast(""), 0);
-    defer _ = unsetenv(@constCast("LIGHTPANDA_DISABLE_TELEMETRY"));
+    _ = setenv(@constCast(DISABLE_ENV), @constCast(""), 0);
+    defer _ = unsetenv(@constCast(DISABLE_ENV));
     try testing.expectEqual(true, isDisabled());
 
     const FailingProvider = struct {

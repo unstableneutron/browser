@@ -170,7 +170,7 @@ Add to your MCP configuration:
 A skill is available in [lightpanda-io/agent-skill](https://github.com/lightpanda-io/agent-skill).
 
 ### Telemetry
-By default, Lightpanda collects and sends usage telemetry. This can be disabled by setting an environment variable `LIGHTPANDA_DISABLE_TELEMETRY=true`. You can read Lightpanda's privacy policy at: [https://lightpanda.io/privacy-policy](https://lightpanda.io/privacy-policy).
+This fork disables usage telemetry by default. To explicitly enable telemetry, set `LIGHTPANDA_DISABLE_TELEMETRY=false`. Leaving the variable unset, setting it to an empty value, or setting it to `true` keeps telemetry disabled. You can read Lightpanda's privacy policy at: [https://lightpanda.io/privacy-policy](https://lightpanda.io/privacy-policy).
 
 ## Status
 
