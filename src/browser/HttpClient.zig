@@ -22,6 +22,7 @@ const builtin = @import("builtin");
 
 const ArenaPool = @import("../ArenaPool.zig");
 const Notification = @import("../Notification.zig");
+const Config = @import("../Config.zig");
 const timestamp = @import("../datetime.zig").timestamp;
 
 const URL = @import("URL.zig");
@@ -303,8 +304,22 @@ pub fn changeProxy(self: *Client, proxy: ?[:0]const u8) !void {
 }
 
 pub fn newHeaders(self: *const Client) !http.Headers {
-    const ua_header = self.user_agent_header_override orelse self.network.config.http_headers.user_agent_header;
-    return http.Headers.init(ua_header);
+    return self.newHeadersWithAccept(Config.HttpHeaders.accept);
+}
+
+pub fn newDocumentHeaders(self: *const Client) !http.Headers {
+    return self.newHeadersWithAccept(self.network.config.http_headers.accept_header);
+}
+
+fn newHeadersWithAccept(self: *const Client, accept: [:0]const u8) !http.Headers {
+    const http_headers = &self.network.config.http_headers;
+    const ua_header = self.user_agent_header_override orelse http_headers.user_agent_header;
+    return http.Headers.initWith(
+        ua_header,
+        http_headers.sec_ch_ua_header,
+        http_headers.accept_language_header,
+        accept,
+    );
 }
 
 pub fn getUserAgent(self: *const Client) [:0]const u8 {
@@ -1458,7 +1473,10 @@ pub const Transfer = struct {
         self.req.params.headers.deinit();
 
         var buf: std.ArrayList(u8) = .empty;
-        var new_headers = try self.client.newHeaders();
+        var new_headers = if (self.req.params.resource_type == .document)
+            try self.client.newDocumentHeaders()
+        else
+            try self.client.newHeaders();
         for (headers) |hdr| {
             // safe to re-use this buffer, because Headers.add because curl copies
             // the value we pass into curl_slist_append.

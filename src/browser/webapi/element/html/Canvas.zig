@@ -95,12 +95,22 @@ pub fn getContext(self: *Canvas, context_type: []const u8, frame: *Frame) !?Draw
         // Spec-correct signal for "no WebGL" is null, so apps that check
         // (Three.js does) can degrade gracefully.
         if (std.mem.eql(u8, context_type, "webgl") or std.mem.eql(u8, context_type, "experimental-webgl")) {
+            if (frame._session.browser.app.config.impersonate().isChromium()) {
+                const ctx = try frame._factory.create(WebGLRenderingContext{});
+                break :blk .{ .webgl = ctx };
+            }
             return null;
         }
         return null;
     };
     self._cached = drawing_context;
     return drawing_context;
+}
+
+pub fn toDataURL(_: *Canvas, maybe_type: ?[]const u8, maybe_quality: ?f64) []const u8 {
+    _ = maybe_type;
+    _ = maybe_quality;
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
 }
 
 /// Transfers control of the canvas to an OffscreenCanvas.
@@ -123,5 +133,6 @@ pub const JsApi = struct {
     pub const width = bridge.accessor(Canvas.getWidth, Canvas.setWidth, .{});
     pub const height = bridge.accessor(Canvas.getHeight, Canvas.setHeight, .{});
     pub const getContext = bridge.function(Canvas.getContext, .{});
+    pub const toDataURL = bridge.function(Canvas.toDataURL, .{});
     pub const transferControlToOffscreen = bridge.function(Canvas.transferControlToOffscreen, .{});
 };

@@ -158,6 +158,9 @@ pub const Profile = enum {
             .{ "chrome142", .chrome142 },
             .{ "chrome145", .chrome145 },
             .{ "chrome146", .chrome146 },
+            .{ "chrome", .chrome146 },
+            .{ "latest-chrome", .chrome146 },
+            .{ "latest_chrome", .chrome146 },
             // Chrome Android
             .{ "chrome99_android", .chrome99_android },
             .{ "chrome131_android", .chrome131_android },
@@ -444,7 +447,298 @@ pub const Profile = enum {
         return &[_][]const u8{ "en-US", "en" };
     }
 
+    pub const ClientHintBrand = struct {
+        brand: []const u8,
+        version: []const u8,
+    };
+
+    pub fn isChromium(self: Profile) bool {
+        return switch (self) {
+            .chrome99,
+            .chrome100,
+            .chrome101,
+            .chrome104,
+            .chrome107,
+            .chrome110,
+            .chrome116,
+            .chrome119,
+            .chrome120,
+            .chrome123,
+            .chrome124,
+            .chrome131,
+            .chrome133a,
+            .chrome136,
+            .chrome142,
+            .chrome145,
+            .chrome146,
+            .chrome99_android,
+            .chrome131_android,
+            .edge99,
+            .edge101,
+            => true,
+            else => false,
+        };
+    }
+
+    pub fn isMobile(self: Profile) bool {
+        return switch (self) {
+            .chrome99_android,
+            .chrome131_android,
+            .safari172_ios,
+            .safari180_ios,
+            .safari184_ios,
+            .safari260_ios,
+            => true,
+            else => false,
+        };
+    }
+
+    pub fn majorVersion(self: Profile) []const u8 {
+        return switch (self) {
+            .lightpanda => "1",
+            .chrome99, .chrome99_android, .edge99 => "99",
+            .chrome100 => "100",
+            .chrome101, .edge101 => "101",
+            .chrome104 => "104",
+            .chrome107 => "107",
+            .chrome110 => "110",
+            .chrome116 => "116",
+            .chrome119 => "119",
+            .chrome120 => "120",
+            .chrome123 => "123",
+            .chrome124 => "124",
+            .chrome131, .chrome131_android => "131",
+            .chrome133a => "133",
+            .chrome136 => "136",
+            .chrome142 => "142",
+            .chrome145 => "145",
+            .chrome146 => "146",
+            .safari153 => "15",
+            .safari155 => "15",
+            .safari170, .safari172_ios => "17",
+            .safari180, .safari184, .safari180_ios, .safari184_ios => "18",
+            .safari260, .safari2601, .safari260_ios => "26",
+            .firefox91esr => "91",
+            .firefox95 => "95",
+            .firefox98 => "98",
+            .firefox100 => "100",
+            .firefox102 => "102",
+            .firefox109 => "109",
+            .firefox117 => "117",
+            .firefox133 => "133",
+            .firefox135 => "135",
+            .firefox144 => "144",
+            .firefox147 => "147",
+            .tor145 => "128",
+        };
+    }
+
+    pub fn fullVersion(self: Profile) []const u8 {
+        return switch (self) {
+            .lightpanda => "1.0.0.0",
+            .chrome99 => "99.0.4844.51",
+            .chrome100 => "100.0.4896.75",
+            .chrome101 => "101.0.4951.67",
+            .chrome104 => "104.0.0.0",
+            .chrome107 => "107.0.0.0",
+            .chrome110 => "110.0.0.0",
+            .chrome116 => "116.0.0.0",
+            .chrome119 => "119.0.0.0",
+            .chrome120 => "120.0.0.0",
+            .chrome123 => "123.0.0.0",
+            .chrome124 => "124.0.0.0",
+            .chrome131, .chrome131_android => "131.0.0.0",
+            .chrome133a => "133.0.0.0",
+            .chrome136 => "136.0.0.0",
+            .chrome142 => "142.0.0.0",
+            .chrome145 => "145.0.0.0",
+            .chrome146 => "146.0.0.0",
+            .chrome99_android => "99.0.4844.58",
+            .edge99 => "99.0.1150.30",
+            .edge101 => "101.0.1210.47",
+            else => self.majorVersion(),
+        };
+    }
+
+    pub fn clientHintPlatform(self: Profile) []const u8 {
+        return switch (self) {
+            .chrome99,
+            .chrome100,
+            .chrome101,
+            .chrome104,
+            .chrome107,
+            .chrome110,
+            .chrome116,
+            .edge99,
+            .edge101,
+            .firefox91esr,
+            .firefox95,
+            .firefox98,
+            .firefox100,
+            .firefox102,
+            .firefox109,
+            .firefox117,
+            => "Windows",
+            .chrome99_android, .chrome131_android => "Android",
+            .safari172_ios, .safari180_ios, .safari184_ios, .safari260_ios => "iOS",
+            else => "macOS",
+        };
+    }
+
+    pub fn clientHintBrands(self: Profile) []const ClientHintBrand {
+        return switch (self) {
+            .chrome99, .chrome99_android => chromiumBrands("99"),
+            .chrome100 => chromiumBrands("100"),
+            .chrome101 => chromiumBrands("101"),
+            .chrome104 => chromiumBrands("104"),
+            .chrome107 => chromiumBrands("107"),
+            .chrome110 => chromiumBrands("110"),
+            .chrome116 => chromiumBrands("116"),
+            .chrome119 => chromiumBrands("119"),
+            .chrome120 => chromiumBrands("120"),
+            .chrome123 => chromiumBrands("123"),
+            .chrome124 => chromiumBrands("124"),
+            .chrome131, .chrome131_android => chromiumBrands("131"),
+            .chrome133a => chromiumBrands("133"),
+            .chrome136 => chromiumBrands("136"),
+            .chrome142 => chromiumBrands("142"),
+            .chrome145 => chromiumBrands("145"),
+            .chrome146 => chromiumBrands("146"),
+            .edge99 => edgeBrands("99"),
+            .edge101 => edgeBrands("101"),
+            else => lightpandaBrands(),
+        };
+    }
+
+    pub fn secChUaHeader(self: Profile) [:0]const u8 {
+        return switch (self) {
+            .chrome99, .chrome99_android => chromiumSecChUa("99"),
+            .chrome100 => chromiumSecChUa("100"),
+            .chrome101 => chromiumSecChUa("101"),
+            .chrome104 => chromiumSecChUa("104"),
+            .chrome107 => chromiumSecChUa("107"),
+            .chrome110 => chromiumSecChUa("110"),
+            .chrome116 => chromiumSecChUa("116"),
+            .chrome119 => chromiumSecChUa("119"),
+            .chrome120 => chromiumSecChUa("120"),
+            .chrome123 => chromiumSecChUa("123"),
+            .chrome124 => chromiumSecChUa("124"),
+            .chrome131, .chrome131_android => chromiumSecChUa("131"),
+            .chrome133a => chromiumSecChUa("133"),
+            .chrome136 => chromiumSecChUa("136"),
+            .chrome142 => chromiumSecChUa("142"),
+            .chrome145 => chromiumSecChUa("145"),
+            .chrome146 => chromiumSecChUa("146"),
+            .edge99 => edgeSecChUa("99"),
+            .edge101 => edgeSecChUa("101"),
+            else => "Sec-Ch-Ua: \"Lightpanda\";v=\"1\"",
+        };
+    }
+
+    pub fn clientHintFullVersionList(self: Profile) []const ClientHintBrand {
+        return switch (self) {
+            .chrome99 => chromiumFullVersionList("99.0.4844.51"),
+            .chrome99_android => chromiumFullVersionList("99.0.4844.58"),
+            .chrome100 => chromiumFullVersionList("100.0.4896.75"),
+            .chrome101 => chromiumFullVersionList("101.0.4951.67"),
+            .chrome104 => chromiumFullVersionList("104.0.0.0"),
+            .chrome107 => chromiumFullVersionList("107.0.0.0"),
+            .chrome110 => chromiumFullVersionList("110.0.0.0"),
+            .chrome116 => chromiumFullVersionList("116.0.0.0"),
+            .chrome119 => chromiumFullVersionList("119.0.0.0"),
+            .chrome120 => chromiumFullVersionList("120.0.0.0"),
+            .chrome123 => chromiumFullVersionList("123.0.0.0"),
+            .chrome124 => chromiumFullVersionList("124.0.0.0"),
+            .chrome131, .chrome131_android => chromiumFullVersionList("131.0.0.0"),
+            .chrome133a => chromiumFullVersionList("133.0.0.0"),
+            .chrome136 => chromiumFullVersionList("136.0.0.0"),
+            .chrome142 => chromiumFullVersionList("142.0.0.0"),
+            .chrome145 => chromiumFullVersionList("145.0.0.0"),
+            .chrome146 => chromiumFullVersionList("146.0.0.0"),
+            .edge99 => edgeFullVersionList("99.0.1150.30"),
+            .edge101 => edgeFullVersionList("101.0.1210.47"),
+            else => lightpandaFullVersionList(),
+        };
+    }
+
+    fn lightpandaBrands() []const ClientHintBrand {
+        return &[_]ClientHintBrand{.{ .brand = "Lightpanda", .version = "1" }};
+    }
+
+    fn lightpandaFullVersionList() []const ClientHintBrand {
+        return &[_]ClientHintBrand{.{ .brand = "Lightpanda", .version = "1.0.0.0" }};
+    }
+
+    fn chromiumBrands(comptime version: []const u8) []const ClientHintBrand {
+        return &[_]ClientHintBrand{
+            .{ .brand = "Not A(Brand", .version = "24" },
+            .{ .brand = "Chromium", .version = version },
+            .{ .brand = "Google Chrome", .version = version },
+        };
+    }
+
+    fn chromiumFullVersionList(comptime full: []const u8) []const ClientHintBrand {
+        return &[_]ClientHintBrand{
+            .{ .brand = "Not A(Brand", .version = "24.0.0.0" },
+            .{ .brand = "Chromium", .version = full },
+            .{ .brand = "Google Chrome", .version = full },
+        };
+    }
+
+    fn chromiumSecChUa(comptime version: []const u8) [:0]const u8 {
+        return "Sec-Ch-Ua: \"Not A(Brand\";v=\"24\", \"Chromium\";v=\"" ++ version ++ "\", \"Google Chrome\";v=\"" ++ version ++ "\"";
+    }
+
+    fn edgeBrands(comptime version: []const u8) []const ClientHintBrand {
+        return &[_]ClientHintBrand{
+            .{ .brand = "Not A(Brand", .version = "24" },
+            .{ .brand = "Chromium", .version = version },
+            .{ .brand = "Microsoft Edge", .version = version },
+        };
+    }
+
+    fn edgeFullVersionList(comptime full: []const u8) []const ClientHintBrand {
+        return &[_]ClientHintBrand{
+            .{ .brand = "Not A(Brand", .version = "24.0.0.0" },
+            .{ .brand = "Chromium", .version = full },
+            .{ .brand = "Microsoft Edge", .version = full },
+        };
+    }
+
+    fn edgeSecChUa(comptime version: []const u8) [:0]const u8 {
+        return "Sec-Ch-Ua: \"Not A(Brand\";v=\"24\", \"Chromium\";v=\"" ++ version ++ "\", \"Microsoft Edge\";v=\"" ++ version ++ "\"";
+    }
+
+    pub fn documentAcceptHeader(self: Profile) [:0]const u8 {
+        return switch (self) {
+            .chrome99,
+            .chrome100,
+            .chrome101,
+            .chrome104,
+            .chrome107,
+            .chrome110,
+            .chrome116,
+            .chrome119,
+            .chrome120,
+            .chrome123,
+            .chrome124,
+            .chrome131,
+            .chrome133a,
+            .chrome136,
+            .chrome142,
+            .chrome145,
+            .chrome146,
+            .chrome99_android,
+            .chrome131_android,
+            .edge99,
+            .edge101,
+            => "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            else => "Accept: */*",
+        };
+    }
+
     pub const supported_profiles = "lightpanda (default), " ++
+        "chrome/latest-chrome/latest_chrome (alias for chrome146), " ++
         "chrome99, chrome100, chrome101, chrome104, chrome107, chrome110, chrome116, " ++
         "chrome119, chrome120, chrome123, chrome124, chrome131, chrome133a, chrome136, chrome142, chrome145, chrome146, " ++
         "chrome99_android, chrome131_android, " ++
@@ -470,6 +764,9 @@ test "Profile.fromString" {
     try testing.expectEqual(Profile.chrome136, Profile.fromString("chrome136").?);
     try testing.expectEqual(Profile.chrome99, Profile.fromString("chrome99").?);
     try testing.expectEqual(Profile.chrome142, Profile.fromString("chrome142").?);
+    try testing.expectEqual(Profile.chrome146, Profile.fromString("chrome").?);
+    try testing.expectEqual(Profile.chrome146, Profile.fromString("latest-chrome").?);
+    try testing.expectEqual(Profile.chrome146, Profile.fromString("latest_chrome").?);
     try testing.expectEqual(Profile.safari260, Profile.fromString("safari260").?);
     try testing.expectEqual(Profile.safari172_ios, Profile.fromString("safari172_ios").?);
     try testing.expectEqual(Profile.tor145, Profile.fromString("tor145").?);
@@ -519,4 +816,28 @@ test "Profile.vendor" {
     try testing.expectEqualStrings("Apple Computer, Inc.", Profile.safari180.vendor());
     try testing.expectEqualStrings("Apple Computer, Inc.", Profile.safari172_ios.vendor());
     try testing.expectEqualStrings("", Profile.tor145.vendor());
+}
+
+test "Profile chromium client hints" {
+    const testing = std.testing;
+
+    try testing.expect(Profile.chrome146.isChromium());
+    try testing.expectEqualStrings("146", Profile.chrome146.majorVersion());
+    try testing.expectEqualStrings("146.0.0.0", Profile.chrome146.fullVersion());
+    try testing.expectEqualStrings("macOS", Profile.chrome146.clientHintPlatform());
+    try testing.expectEqual(false, Profile.chrome146.isMobile());
+    try testing.expectEqualStrings("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7", Profile.chrome146.documentAcceptHeader());
+
+    const brands = Profile.chrome146.clientHintBrands();
+    try testing.expectEqual(@as(usize, 3), brands.len);
+    try testing.expectEqualStrings("Chromium", brands[1].brand);
+    try testing.expectEqualStrings("146", brands[1].version);
+    try testing.expectEqualStrings("Google Chrome", brands[2].brand);
+    try testing.expectEqualStrings("146", brands[2].version);
+    try testing.expectEqualStrings("Sec-Ch-Ua: \"Not A(Brand\";v=\"24\", \"Chromium\";v=\"146\", \"Google Chrome\";v=\"146\"", Profile.chrome146.secChUaHeader());
+
+    const full_version_brands = Profile.chrome146.clientHintFullVersionList();
+    try testing.expectEqual(@as(usize, 3), full_version_brands.len);
+    try testing.expectEqualStrings("146.0.0.0", full_version_brands[1].version);
+    try testing.expectEqualStrings("146.0.0.0", full_version_brands[2].version);
 }

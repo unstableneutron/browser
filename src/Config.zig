@@ -72,6 +72,14 @@ fn logLevelValidator(_: Allocator, args: *std.process.ArgIterator) !?log.Level {
     };
 }
 
+fn impersonateValidator(_: Allocator, args: *std.process.ArgIterator) !?BrowserProfile {
+    const str = args.next() orelse return error.MissingArgument;
+    return BrowserProfile.fromString(str) orelse {
+        log.fatal(.app, "invalid option choice", .{ .arg = "--impersonate", .value = str });
+        return error.InvalidArgument;
+    };
+}
+
 /// Common CLI args.
 const CommonOptions = .{
     .{ .name = "obey_robots", .type = bool },
@@ -93,7 +101,7 @@ const CommonOptions = .{
     .{ .name = "web_bot_auth_keyid", .type = ?[]const u8 },
     .{ .name = "web_bot_auth_domain", .type = ?[]const u8 },
     .{ .name = "user_agent", .type = ?[]const u8 },
-    .{ .name = "impersonate", .type = ?BrowserProfile },
+    .{ .name = "impersonate", .type = ?BrowserProfile, .validator = impersonateValidator },
     .{ .name = "block_private_networks", .type = bool },
     .{ .name = "block_cidrs", .type = ?[]const u8 },
     .{ .name = "cookie", .type = ?[]const u8 },
@@ -210,6 +218,8 @@ const Commands = cli.Builder(.{
 
 pub const RunMode = Commands.Enum;
 pub const Mode = Commands.Union;
+
+const IMPERSONATE_ENV = "LIGHTPANDA_IMPERSONATE";
 
 mode: Mode,
 exec_name: []const u8,
@@ -475,30 +485,20 @@ pub const HttpHeaders = struct {
         version: [:0]const u8,
     };
 
-    /// Source of truth for client-hints brand data. Both the Sec-Ch-Ua
-    /// HTTP header and navigator.userAgentData.brands derive from this
-    /// list, so the two sides cannot drift.
-    pub const brands = [_]Brand{
-        .{ .brand = "Lightpanda", .version = "1" },
-    };
-
-    pub const sec_ch_ua: [:0]const u8 = blk: {
-        var out: [:0]const u8 = "Sec-Ch-Ua:";
-        for (brands, 0..) |b, i| {
-            const sep = if (i == 0) " " else ", ";
-            out = out ++ sep ++ "\"" ++ b.brand ++ "\";v=\"" ++ b.version ++ "\"";
-        }
-        break :blk out;
-    };
+    pub const sec_ch_ua: [:0]const u8 = "Sec-Ch-Ua: \"Lightpanda\";v=\"1\"";
 
     // Some bot-protection frontends (e.g. Akamai on canada.ca) RST the HTTP/2
     // stream when a client sends Accept-Encoding without Accept-Language,
     // treating it as a bot signal. Ship a neutral default so we look like a
     // normal client.
     pub const accept_language: [:0]const u8 = "Accept-Language: en-US,en;q=0.9";
+    pub const accept: [:0]const u8 = "Accept: */*";
 
     user_agent: [:0]const u8, // User agent value (e.g. "Lightpanda/1.0")
     user_agent_header: [:0]const u8,
+    sec_ch_ua_header: [:0]const u8,
+    accept_language_header: [:0]const u8,
+    accept_header: [:0]const u8,
     owns_user_agent: bool,
 
     proxy_bearer_header: ?[:0]const u8,
@@ -520,9 +520,13 @@ pub const HttpHeaders = struct {
         else
             null;
 
+        const profile = config.impersonate();
         return .{
             .user_agent = user_agent,
             .user_agent_header = user_agent_header,
+            .sec_ch_ua_header = profile.secChUaHeader(),
+            .accept_language_header = profile.acceptLanguage(),
+            .accept_header = profile.documentAcceptHeader(),
             .owns_user_agent = owns_user_agent,
             .proxy_bearer_header = proxy_bearer_header,
         };
@@ -838,11 +842,29 @@ pub fn printUsageAndExit(self: *const Config, success: bool) void {
 }
 
 pub fn parseArgs(allocator: Allocator) !Config {
-    const exec_name, const command = try Commands.parse(allocator);
+    const exec_name, var command = try Commands.parse(allocator);
+    try applyEnvImpersonate(&command);
     if (command == .serve and command.serve.timeout != null) {
         log.warn(.app, "--timeout is deprecated", .{});
     }
     return .init(allocator, exec_name, command);
+}
+
+fn applyEnvImpersonate(command: *Mode) !void {
+    switch (command.*) {
+        inline .serve, .fetch, .mcp => |*opts| {
+            if (opts.impersonate != null) return;
+
+            const raw = std.posix.getenv(IMPERSONATE_ENV) orelse return;
+            if (raw.len == 0) return;
+
+            opts.impersonate = BrowserProfile.fromString(raw) orelse {
+                log.fatal(.app, "invalid environment value", .{ .env = IMPERSONATE_ENV, .value = raw });
+                return error.InvalidArgument;
+            };
+        },
+        .help, .version => {},
+    }
 }
 
 pub fn validateUserAgent(ua: []const u8) !void {

@@ -53,7 +53,7 @@ const IS_DEBUG = builtin.mode == .Debug;
 const Allocator = std.mem.Allocator;
 
 pub fn registerTypes() []const type {
-    return &.{ Window, CrossOriginWindow };
+    return &.{ Window, CrossOriginWindow, Chrome };
 }
 
 const Window = @This();
@@ -65,6 +65,7 @@ _css: CSS = .init,
 _crypto: Crypto = .init,
 _console: Console = .init,
 _navigator: Navigator = .init,
+_chrome: Chrome = .{},
 _screen: *Screen,
 _visual_viewport: *VisualViewport,
 _performance: Performance,
@@ -168,6 +169,11 @@ pub fn getConsole(self: *Window) *Console {
 
 pub fn getNavigator(self: *Window) *Navigator {
     return &self._navigator;
+}
+
+pub fn getChrome(self: *Window, frame: *Frame) ?*Chrome {
+    if (frame._session.browser.app.config.impersonate().isChromium()) return &self._chrome;
+    return null;
 }
 
 pub fn getScreen(self: *Window) *Screen {
@@ -862,6 +868,7 @@ pub const JsApi = struct {
     pub const window = bridge.accessor(Window.getWindow, null, .{});
     pub const parent = bridge.accessor(Window.getParent, null, .{});
     pub const navigator = bridge.accessor(Window.getNavigator, null, .{});
+    pub const chrome = bridge.accessor(Window.getChrome, null, .{ .null_as_undefined = true });
     pub const screen = bridge.accessor(Window.getScreen, null, .{});
     pub const visualViewport = bridge.accessor(Window.getVisualViewport, null, .{});
     pub const performance = bridge.accessor(Window.getPerformance, null, .{});
@@ -978,6 +985,21 @@ pub const JsApi = struct {
     }.prompt, .{});
 
     pub const webdriver = bridge.accessor(Window.getWebDriver, null, .{ .wpt_only = true });
+};
+
+const Chrome = struct {
+    _pad: bool = false,
+
+    pub const JsApi = struct {
+        pub const bridge = js.Bridge(Chrome);
+
+        pub const Meta = struct {
+            pub const name = "Chrome";
+            pub const prototype_chain = bridge.prototypeChain();
+            pub var class_id: bridge.ClassId = undefined;
+            pub const empty_with_no_proto = true;
+        };
+    };
 };
 
 const CrossOriginWindow = struct {

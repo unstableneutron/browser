@@ -19,7 +19,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const Config = @import("../../Config.zig");
+const BrowserProfile = @import("../../browser_profile.zig").Profile;
 const js = @import("../js/js.zig");
 const Frame = @import("../Frame.zig");
 
@@ -27,32 +27,30 @@ const NavigatorUAData = @This();
 
 _pad: bool = false,
 
-const Brand = struct {
-    brand: []const u8,
-    version: []const u8,
-};
+const Brand = BrowserProfile.ClientHintBrand;
 
-pub fn getBrands(_: *const NavigatorUAData) []const Brand {
-    return brandList();
+pub fn getBrands(_: *const NavigatorUAData, frame: *Frame) []const Brand {
+    return activeProfile(frame).clientHintBrands();
 }
 
-pub fn getMobile(_: *const NavigatorUAData) bool {
-    return false;
+pub fn getMobile(_: *const NavigatorUAData, frame: *Frame) bool {
+    return activeProfile(frame).isMobile();
 }
 
-pub fn getPlatform(_: *const NavigatorUAData) []const u8 {
-    return uaPlatform();
+pub fn getPlatform(_: *const NavigatorUAData, frame: *Frame) []const u8 {
+    return activeProfile(frame).clientHintPlatform();
 }
 
-pub fn toJSON(_: *const NavigatorUAData) struct {
+pub fn toJSON(_: *const NavigatorUAData, frame: *Frame) struct {
     brands: []const Brand,
     mobile: bool,
     platform: []const u8,
 } {
+    const profile = activeProfile(frame);
     return .{
-        .mobile = false,
-        .brands = brandList(),
-        .platform = uaPlatform(),
+        .mobile = profile.isMobile(),
+        .brands = profile.clientHintBrands(),
+        .platform = profile.clientHintPlatform(),
     };
 }
 
@@ -63,42 +61,24 @@ pub fn getHighEntropyValues(_: *const NavigatorUAData, hints: []const []const u8
 
     _ = hints;
 
+    const profile = activeProfile(frame);
     return frame.js.local.?.resolvePromise(.{
-        .brands = brandList(),
-        .mobile = false,
-        .platform = uaPlatform(),
+        .brands = profile.clientHintBrands(),
+        .mobile = profile.isMobile(),
+        .platform = profile.clientHintPlatform(),
         .architecture = uaArchitecture(),
         .bitness = uaBitness(),
         .model = "",
         .platformVersion = "",
-        .uaFullVersion = "1.0.0.0",
-        .fullVersionList = brandList(),
+        .uaFullVersion = profile.fullVersion(),
+        .fullVersionList = profile.clientHintFullVersionList(),
         .wow64 = false,
-        .formFactor = [_][]const u8{"Desktop"},
+        .formFactor = if (profile.isMobile()) [_][]const u8{"Mobile"} else [_][]const u8{"Desktop"},
     });
 }
 
-fn brandList() []const Brand {
-    const out = comptime blk: {
-        const src = &Config.HttpHeaders.brands;
-        var arr: [src.len]Brand = undefined;
-        for (src, 0..) |b, i| {
-            arr[i] = .{ .brand = b.brand, .version = b.version };
-        }
-        const final = arr;
-        break :blk final;
-    };
-    return &out;
-}
-
-fn uaPlatform() []const u8 {
-    return switch (builtin.os.tag) {
-        .macos => "macOS",
-        .windows => "Windows",
-        .linux => "Linux",
-        .freebsd => "FreeBSD",
-        else => "Unknown",
-    };
+fn activeProfile(frame: *const Frame) BrowserProfile {
+    return frame._session.browser.app.config.impersonate();
 }
 
 fn uaArchitecture() []const u8 {

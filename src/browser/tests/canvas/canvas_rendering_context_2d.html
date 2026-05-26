@@ -11,6 +11,21 @@
 }
 </script>
 
+<script id=HTMLCanvasElement#toDataURL>
+{
+  const element = document.createElement("canvas");
+  element.width = 10;
+  element.height = 10;
+  const ctx = element.getContext("2d");
+  ctx.fillStyle = "#abc";
+  ctx.fillRect(0, 0, 10, 10);
+
+  const dataUrl = element.toDataURL();
+  testing.expectEqual('string', typeof dataUrl);
+  testing.expectEqual(true, dataUrl.startsWith('data:image/png;base64,'));
+}
+</script>
+
 <script id=CanvasRenderingContext2D#fillStyle>
 {
   const element = document.createElement("canvas");

@@ -620,7 +620,7 @@ pub fn navigate(self: *Frame, request_url: [:0]const u8, opts: NavigateOpts) !vo
         .header = if (opts.header) |h| try self.arena.dupeZ(u8, h) else null,
     };
 
-    var headers = try http_client.newHeaders();
+    var headers = try http_client.newDocumentHeaders();
     if (opts.header) |hdr| {
         try headers.add(hdr);
     }

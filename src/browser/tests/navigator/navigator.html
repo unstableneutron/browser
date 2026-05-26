@@ -27,6 +27,18 @@
   testing.expectEqual('Gecko', navigator.product);
   testing.expectEqual(false, navigator.javaEnabled());
   testing.expectEqual(false, navigator.webdriver);
+
+  testing.expectEqual(5, navigator.plugins.length);
+  testing.expectEqual('PDF Viewer', navigator.plugins[0].name);
+  testing.expectEqual('Portable Document Format', navigator.plugins[0].description);
+  testing.expectEqual('internal-pdf-viewer', navigator.plugins[0].filename);
+  testing.expectEqual('Chrome PDF Viewer', navigator.plugins[1].name);
+  testing.expectEqual('Chromium PDF Viewer', navigator.plugins[2].name);
+  testing.expectEqual('Chrome PDF Viewer', navigator.plugins.namedItem('Chrome PDF Viewer').name);
+  testing.expectEqual(2, navigator.mimeTypes.length);
+  testing.expectEqual('application/pdf', navigator.mimeTypes[0].type);
+  testing.expectEqual('text/pdf', navigator.mimeTypes[1].type);
+  testing.expectEqual('text/pdf', navigator.mimeTypes.namedItem('text/pdf').type);
 </script>
 
 <script id=permission_query type=module>
@@ -121,4 +133,3 @@
     }
   }
 </script>
-
